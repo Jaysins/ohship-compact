@@ -187,9 +187,11 @@ export default function PaymentPage() {
         toast.success("Payment proof uploaded successfully!")
         toast.info("Your payment is being verified. You will receive a confirmation email shortly.")
 
+
         // Redirect to success page or dashboard
         setTimeout(() => {
-          router.push(`/shipment/${shipmentId}/success`)
+          
+          router.push(`/shipment/${shipment?.code}/success`)
         }, 2000)
       }
     } catch (error: any) {

@@ -6,11 +6,12 @@ import { useRouter } from "next/navigation"
 import { categoriesApi } from "@/lib/api/categories"
 import { quotesApi } from "@/lib/api/quotes"
 import type { Category } from "@/types/category"
-import type { QuoteRequest } from "@/types/quote"
+import type { QuoteItem, QuoteRequest, ShipmentItemUI } from "@/types/quote"
 import { COUNTRIES, CURRENCIES, PACKAGE_TYPES } from "@/lib/data/countries"
 import { handleApiError, showSuccess } from "@/lib/utils/error-handler"
 import { setStorageItem, getStorageItem, StorageKey } from "@/lib/utils/storage"
 import { Button, Input, Select, LoadingSpinner } from "@/components/ui"
+
 
 export default function CreateShipmentPage() {
   const router = useRouter()
@@ -32,14 +33,19 @@ export default function CreateShipmentPage() {
   const [destState, setDestState] = useState("")
   const [destCity, setDestCity] = useState("")
 
-  // Form state - Item details
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
-  const [itemDescription, setItemDescription] = useState("")
-  const [packageType, setPackageType] = useState<"envelope" | "box" | "pallet" | "tube" | "pak">("box")
-  const [quantity, setQuantity] = useState("1")
-  const [weight, setWeight] = useState("")
-  const [dimensions, setDimensions] = useState({ length: "", width: "", height: "" })
-  const [declaredValue, setDeclaredValue] = useState("")
+  // Form state - Items (multiple)
+  const [items, setItems] = useState<ShipmentItemUI[]>([
+    {
+      id: crypto.randomUUID(),
+      categoryId: "",
+      description: "",
+      packageType: "box",
+      quantity: "1",
+      weight: "",
+      dimensions: { length: "", width: "", height: "" },
+      declaredValue: "",
+    },
+  ])
 
   // Form state - Other
   const [currency, setCurrency] = useState("NGN")
@@ -48,6 +54,14 @@ export default function CreateShipmentPage() {
   // Get available states for selected countries
   const originStates = COUNTRIES.find((c) => c.code === originCountry)?.states || []
   const destStates = COUNTRIES.find((c) => c.code === destCountry)?.states || []
+  
+  const PACKAGE_DEFAULT_WEIGHTS: Record<string, number> = {
+    envelope: 0.2,
+    box: 1,
+    pallet: 10,
+    tube: 0.5,
+    pak: 0.3,
+  }
 
   // Load categories on mount
   useEffect(() => {
@@ -65,8 +79,10 @@ export default function CreateShipmentPage() {
         }, [])
 
         setCategories(uniqueCategories)
-        if (uniqueCategories.length > 0) {
-          setSelectedCategory(uniqueCategories[0])
+        
+        // Set default category for first item
+        if (uniqueCategories.length > 0 && items[0]) {
+          updateItem(0, { categoryId: uniqueCategories[0].id })
         }
       } catch (error) {
         handleApiError(error)
@@ -88,22 +104,15 @@ export default function CreateShipmentPage() {
       setDestCountry(draft.destCountry || "US")
       setDestState(draft.destState || "")
       setDestCity(draft.destCity || "")
-      setItemDescription(draft.itemDescription || "")
-      setPackageType(draft.packageType || "box")
-      setQuantity(draft.quantity || "1")
-      setWeight(draft.weight || "")
-      setDimensions(draft.dimensions || { length: "", width: "", height: "" })
-      setDeclaredValue(draft.declaredValue || "")
       setCurrency(draft.currency || "NGN")
       setIsInsured(draft.isInsured !== undefined ? draft.isInsured : true)
 
-      // Restore selected category
-      if (draft.categoryId && categories.length > 0) {
-        const cat = categories.find(c => c.id === draft.categoryId)
-        if (cat) setSelectedCategory(cat)
+      // Restore items
+      if (draft.items && Array.isArray(draft.items)) {
+        setItems(draft.items)
       }
     }
-  }, [categories])
+  }, [])
 
   // Auto-save draft
   useEffect(() => {
@@ -115,13 +124,7 @@ export default function CreateShipmentPage() {
         destCountry,
         destState,
         destCity,
-        categoryId: selectedCategory?.id,
-        itemDescription,
-        packageType,
-        quantity,
-        weight,
-        dimensions,
-        declaredValue,
+        items,
         currency,
         isInsured,
       }
@@ -129,14 +132,39 @@ export default function CreateShipmentPage() {
     }, 1000)
 
     return () => clearTimeout(saveTimer)
-  }, [originCountry, originState, originCity, destCountry, destState, destCity, selectedCategory, itemDescription, packageType, quantity, weight, dimensions, declaredValue, currency, isInsured])
+  }, [originCountry, originState, originCity, destCountry, destState, destCity, items, currency, isInsured])
 
-  // Handle category change
-  const handleCategoryChange = (categoryId: string) => {
-    const category = categories.find((c) => c.id === categoryId)
-    if (category) {
-      setSelectedCategory(category)
+  // Item management functions
+  const addItem = () => {
+    const newItem: ShipmentItemUI = {
+      id: crypto.randomUUID(),
+      categoryId: categories[0]?.id || "",
+      description: "",
+      packageType: "box",
+      quantity: "1",
+      weight: "1",
+      dimensions: { length: "", width: "", height: "" },
+      declaredValue: "",
     }
+    setItems([...items, newItem])
+  }
+
+  const removeItem = (index: number) => {
+    if (items.length > 1) {
+      setItems(items.filter((_, i) => i !== index))
+    }
+  }
+
+  const updateItem = (index: number, updates: Partial<ShipmentItemUI>) => {
+    setItems(items.map((item, i) => (i === index ? { ...item, ...updates } : item)))
+  }
+
+  const handlePackageTypeChange = (index: number, value: string) => {
+    const defaultWeight = PACKAGE_DEFAULT_WEIGHTS[value]
+    updateItem(index, {
+      packageType: value as any,
+      weight: defaultWeight ? defaultWeight.toString() : items[index].weight,
+    })
   }
 
   const handleGetQuotes = async () => {
@@ -158,25 +186,29 @@ export default function CreateShipmentPage() {
       return
     }
 
-    if (!selectedCategory) {
-      handleApiError(new Error("Please select item category"))
-      return
-    }
-    if (!itemDescription.trim()) {
-      handleApiError(new Error("Please enter item description"))
-      return
-    }
-    if (!weight || parseFloat(weight) <= 0) {
-      handleApiError(new Error("Please enter a valid weight"))
-      return
-    }
-    if (!quantity || parseInt(quantity) <= 0) {
-      handleApiError(new Error("Please enter a valid quantity"))
-      return
-    }
-    if (!declaredValue || parseFloat(declaredValue) <= 0) {
-      handleApiError(new Error("Please enter declared value"))
-      return
+    // Validate all items
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (!item.categoryId) {
+        handleApiError(new Error(`Please select category for item ${i + 1}`))
+        return
+      }
+      if (!item.description.trim()) {
+        handleApiError(new Error(`Please enter description for item ${i + 1}`))
+        return
+      }
+      if (!item.weight || parseFloat(item.weight) <= 0) {
+        handleApiError(new Error(`Please enter valid weight for item ${i + 1}`))
+        return
+      }
+      if (!item.quantity || parseInt(item.quantity) <= 0) {
+        handleApiError(new Error(`Please enter valid quantity for item ${i + 1}`))
+        return
+      }
+      if (!item.declaredValue || parseFloat(item.declaredValue) <= 0) {
+        handleApiError(new Error(`Please enter declared value for item ${i + 1}`))
+        return
+      }
     }
 
     setLoading(true)
@@ -193,23 +225,24 @@ export default function CreateShipmentPage() {
           state: destState.toLowerCase(),
           city: destCity.toLowerCase() || undefined,
         },
-        items: [
-          {
-            category_id: selectedCategory.id,
-            category_name: selectedCategory.name,
-            category_description: selectedCategory.description,
-            category_hs_code: selectedCategory.hs_code,
-            category_group_tag: selectedCategory.group_tag,
-            description: itemDescription,
-            package_type: packageType,
-            quantity: parseInt(quantity),
-            weight: parseFloat(weight),
-            length: dimensions.length ? parseFloat(dimensions.length) : undefined,
-            width: dimensions.width ? parseFloat(dimensions.width) : undefined,
-            height: dimensions.height ? parseFloat(dimensions.height) : undefined,
-            declared_value: parseFloat(declaredValue),
-          },
-        ],
+        items: items.map((item): QuoteItem => {
+          const category = categories.find((c) => c.id === item.categoryId)!
+          return {
+            category_id: category.id,
+            category_name: category.name,
+            category_description: category.description,
+            category_hs_code: category.hs_code,
+            category_group_tag: category.group_tag,
+            description: item.description,
+            package_type: item.packageType,
+            quantity: parseInt(item.quantity),
+            weight: parseFloat(item.weight),
+            length: item.dimensions.length ? parseFloat(item.dimensions.length) : undefined,
+            width: item.dimensions.width ? parseFloat(item.dimensions.width) : undefined,
+            height: item.dimensions.height ? parseFloat(item.dimensions.height) : undefined,
+            declared_value: parseFloat(item.declaredValue),
+          }
+        }),
         currency: currency,
         is_insured: isInsured,
       }
@@ -362,110 +395,170 @@ export default function CreateShipmentPage() {
               </div>
             </div>
 
-            {/* Package Details Card */}
-            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Package Information</h2>
-              <div className="mt-6 flex flex-col gap-6">
-                <Select
-                  label="Item Category"
-                  value={selectedCategory?.id || ""}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
-                  options={categories.map((c) => ({ value: c.id, label: c.name, key: c.id }))}
-                />
+            {/* Items Section */}
+            {items.map((item, index) => (
+              <div
+                key={item.id}
+                className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/50"
+              >
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">
+                    Item {index + 1}
+                  </h2>
+                  {items.length > 1 && (
+                    <button
+                      onClick={() => removeItem(index)}
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors"
+                      aria-label="Remove item"
+                    >
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
 
-                {selectedCategory && (
-                  <div className="rounded-lg bg-slate-50 dark:bg-slate-800 p-3 text-sm">
-                    <p className="text-slate-600 dark:text-slate-400">{selectedCategory.description}</p>
-                    <p className="text-slate-500 dark:text-slate-500 text-xs mt-1">
-                      HS Code: {selectedCategory.hs_code}
+                <div className="flex flex-col gap-6">
+                  <Select
+                    label="Item Category"
+                    value={item.categoryId}
+                    onChange={(e) => updateItem(index, { categoryId: e.target.value })}
+                    options={categories.map((c) => ({ value: c.id, label: c.name, key: c.id }))}
+                  />
+
+                  {item.categoryId && (
+                    <div className="rounded-lg bg-slate-50 dark:bg-slate-800 p-3 text-sm">
+                      <p className="text-slate-600 dark:text-slate-400">
+                        {categories.find((c) => c.id === item.categoryId)?.description}
+                      </p>
+                      <p className="text-slate-500 dark:text-slate-500 text-xs mt-1">
+                        HS Code: {categories.find((c) => c.id === item.categoryId)?.hs_code}
+                      </p>
+                    </div>
+                  )}
+
+                  <Input
+                    label="Item Description"
+                    value={item.description}
+                    onChange={(e) => updateItem(index, { description: e.target.value })}
+                    placeholder="e.g., Leather backpack with laptop compartment"
+                  />
+
+                  <Select
+                    label="Package Type"
+                    value={item.packageType}
+                    onChange={(e) => handlePackageTypeChange(index, e.target.value)}
+                    options={PACKAGE_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+                  />
+
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+                    <Input
+                      label="Quantity"
+                      type="number"
+                      value={item.quantity}
+                      onChange={(e) => updateItem(index, { quantity: e.target.value })}
+                      placeholder="1"
+                      min="1"
+                      step="1"
+                    />
+
+                    <Input
+                      label="Weight (kg)"
+                      type="number"
+                      value={item.weight}
+                      onChange={(e) => {
+                        const newWeight = e.target.value
+                        if (item.packageType !== "other") {
+                          updateItem(index, { packageType: "other", weight: newWeight })
+                        } else {
+                          updateItem(index, { weight: newWeight })
+                        }
+                      }}
+                      placeholder="2.5"
+                      step="0.1"
+                      min="0.1"
+                    />
+                  </div>
+
+                  <div>
+                    <p className="pb-3 text-base font-medium text-slate-800 dark:text-slate-200">
+                      Dimensions (cm) - Optional
                     </p>
+                    <div className="grid grid-cols-3 gap-3">
+                      <Input
+                        type="number"
+                        value={item.dimensions.length}
+                        onChange={(e) =>
+                          updateItem(index, {
+                            dimensions: { ...item.dimensions, length: e.target.value },
+                          })
+                        }
+                        placeholder="Length"
+                        step="0.1"
+                        min="0"
+                      />
+                      <Input
+                        type="number"
+                        value={item.dimensions.width}
+                        onChange={(e) =>
+                          updateItem(index, {
+                            dimensions: { ...item.dimensions, width: e.target.value },
+                          })
+                        }
+                        placeholder="Width"
+                        step="0.1"
+                        min="0"
+                      />
+                      <Input
+                        type="number"
+                        value={item.dimensions.height}
+                        onChange={(e) =>
+                          updateItem(index, {
+                            dimensions: { ...item.dimensions, height: e.target.value },
+                          })
+                        }
+                        placeholder="Height"
+                        step="0.1"
+                        min="0"
+                      />
+                    </div>
                   </div>
-                )}
 
-                <Input
-                  label="Item Description"
-                  value={itemDescription}
-                  onChange={(e) => setItemDescription(e.target.value)}
-                  placeholder="e.g., Leather backpack with laptop compartment"
-                />
-
-                <Select
-                  label="Package Type"
-                  value={packageType}
-                  onChange={(e) => setPackageType(e.target.value as any)}
-                  options={PACKAGE_TYPES.map((t) => ({ value: t.value, label: t.label }))}
-                />
-
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                  <Input
-                    label="Quantity"
-                    type="number"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    placeholder="1"
-                    min="1"
-                    step="1"
-                  />
-
-                  <Input
-                    label="Weight (kg)"
-                    type="number"
-                    value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
-                    placeholder="2.5"
-                    step="0.1"
-                    min="0.1"
-                  />
-                </div>
-
-                <div>
-                  <p className="pb-3 text-base font-medium text-slate-800 dark:text-slate-200">Dimensions (cm) - Optional</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    <Input
-                      type="number"
-                      value={dimensions.length}
-                      onChange={(e) => setDimensions({ ...dimensions, length: e.target.value })}
-                      placeholder="Length"
-                      step="0.1"
-                      min="0"
-                    />
-                    <Input
-                      type="number"
-                      value={dimensions.width}
-                      onChange={(e) => setDimensions({ ...dimensions, width: e.target.value })}
-                      placeholder="Width"
-                      step="0.1"
-                      min="0"
-                    />
-                    <Input
-                      type="number"
-                      value={dimensions.height}
-                      onChange={(e) => setDimensions({ ...dimensions, height: e.target.value })}
-                      placeholder="Height"
-                      step="0.1"
-                      min="0"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <Input
                     label="Declared Value"
                     type="number"
-                    value={declaredValue}
-                    onChange={(e) => setDeclaredValue(e.target.value)}
+                    value={item.declaredValue}
+                    onChange={(e) => updateItem(index, { declaredValue: e.target.value })}
                     placeholder="1000"
                     step="0.01"
                     min="0.01"
                   />
-
-                  <Select
-                    label="Currency"
-                    value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
-                    options={CURRENCIES.map((c) => ({ value: c.code, label: c.name }))}
-                  />
                 </div>
+              </div>
+            ))}
+
+            {/* Add Item Button */}
+            <button
+              onClick={addItem}
+              className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 p-6 text-slate-600 hover:border-primary hover:bg-primary/5 hover:text-primary dark:border-slate-700 dark:bg-slate-800/50 dark:text-slate-400 dark:hover:border-primary dark:hover:text-primary transition-colors"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              <span className="font-medium">Add Another Item</span>
+            </button>
+
+            {/* Shipment Options */}
+            <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50 mb-6">Shipment Options</h2>
+              
+              <div className="flex flex-col gap-6">
+                <Select
+                  label="Currency"
+                  value={currency}
+                  onChange={(e) => setCurrency(e.target.value)}
+                  options={CURRENCIES.map((c) => ({ value: c.code, label: c.name }))}
+                />
 
                 <div className="flex items-center gap-3">
                   <input
@@ -487,7 +580,10 @@ export default function CreateShipmentPage() {
 
       {/* Sticky Footer CTA */}
       <footer className="sticky bottom-0 mt-auto w-full border-t border-slate-200 bg-white/80 py-4 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="mx-auto flex max-w-3xl justify-end px-4">
+        <div className="mx-auto flex max-w-3xl justify-between items-center px-4">
+          <p className="text-sm text-slate-600 dark:text-slate-400">
+            {items.length} {items.length === 1 ? "item" : "items"} in shipment
+          </p>
           <Button
             onClick={handleGetQuotes}
             loading={loading}

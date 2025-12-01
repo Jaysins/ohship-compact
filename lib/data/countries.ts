@@ -150,4 +150,6 @@ export const PACKAGE_TYPES = [
   { value: 'pallet', label: 'Pallet' },
   { value: 'tube', label: 'Tube' },
   { value: 'pak', label: 'Pak' },
+    { value: 'other', label: 'Other' },
+
 ] as const

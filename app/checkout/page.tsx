@@ -92,11 +92,6 @@ export default function CheckoutPage() {
       setExpandedSection("sender")
       return false
     }
-    if (!senderPostalCode.trim()) {
-      toast.error("Please enter sender postal code")
-      setExpandedSection("sender")
-      return false
-    }
 
     // Receiver validation
     if (!receiverName.trim()) {
