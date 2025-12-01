@@ -110,39 +110,39 @@ export default function FetchQuotesPage() {
       </div>
 
       {/* Progress Indicator */}
-      <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+      <div className="border-b border-slate-200 bg-slate-50 px-4 md:px-6 py-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+            <div className="flex flex-col items-center gap-1 md:flex-row md:gap-2">
+              <div className="h-8 w-8 md:h-9 md:w-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                 ✓
               </div>
-              <span className="text-sm font-medium text-slate-700">Shipment Details</span>
+              <span className="hidden md:block text-sm font-medium text-slate-700">Details</span>
             </div>
-            <div className="flex-1 h-1 bg-primary mx-4"></div>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+            <div className="flex-1 h-1 bg-primary mx-2 md:mx-3"></div>
+            <div className="flex flex-col items-center gap-1 md:flex-row md:gap-2">
+              <div className="h-8 w-8 md:h-9 md:w-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                 2
               </div>
-              <span className="text-sm font-medium text-slate-900">Select Quote</span>
+              <span className="hidden md:block text-sm font-medium text-slate-900">Quote</span>
             </div>
-            <div className="flex-1 h-1 bg-slate-200 mx-4"></div>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center text-sm font-bold">
+            <div className="flex-1 h-1 bg-slate-200 mx-2 md:mx-3"></div>
+            <div className="flex flex-col items-center gap-1 md:flex-row md:gap-2">
+              <div className="h-8 w-8 md:h-9 md:w-9 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center text-sm font-bold">
                 3
               </div>
-              <span className="text-sm font-medium text-slate-400">Shipment Info</span>
+              <span className="hidden md:block text-sm font-medium text-slate-400">Info</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 lg:p-8 bg-slate-50">
+      <main className="flex-1 p-4 md:p-6 lg:p-8 bg-slate-50">
         <div className="max-w-4xl mx-auto">
           {/* Shipment Summary */}
           {searchParams && (
-            <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6 shadow-sm">
+            <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-6 mb-6 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900 mb-4">Shipment Summary</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>

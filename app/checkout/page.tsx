@@ -216,45 +216,45 @@ export default function CheckoutPage() {
       </div>
 
       {/* Progress Indicator */}
-      <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+      <div className="border-b border-slate-200 bg-slate-50 px-4 md:px-6 py-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+            <div className="flex flex-col items-center gap-1 md:flex-row md:gap-2">
+              <div className="h-8 w-8 md:h-9 md:w-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                 ✓
               </div>
-              <span className="text-sm font-medium text-slate-700">Details</span>
+              <span className="hidden md:block text-sm font-medium text-slate-700">Details</span>
             </div>
-            <div className="flex-1 h-1 bg-primary mx-4"></div>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+            <div className="flex-1 h-1 bg-primary mx-2 md:mx-3"></div>
+            <div className="flex flex-col items-center gap-1 md:flex-row md:gap-2">
+              <div className="h-8 w-8 md:h-9 md:w-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                 ✓
               </div>
-              <span className="text-sm font-medium text-slate-700">Quote</span>
+              <span className="hidden md:block text-sm font-medium text-slate-700">Quote</span>
             </div>
-            <div className="flex-1 h-1 bg-primary mx-4"></div>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+            <div className="flex-1 h-1 bg-primary mx-2 md:mx-3"></div>
+            <div className="flex flex-col items-center gap-1 md:flex-row md:gap-2">
+              <div className="h-8 w-8 md:h-9 md:w-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                 3
               </div>
-              <span className="text-sm font-medium text-slate-900">Shipment</span>
+              <span className="hidden md:block text-sm font-medium text-slate-900">Shipment</span>
             </div>
-            <div className="flex-1 h-1 bg-slate-200 mx-4"></div>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center text-sm font-bold">
+            <div className="flex-1 h-1 bg-slate-200 mx-2 md:mx-3"></div>
+            <div className="flex flex-col items-center gap-1 md:flex-row md:gap-2">
+              <div className="h-8 w-8 md:h-9 md:w-9 rounded-full bg-slate-200 text-slate-400 flex items-center justify-center text-sm font-bold">
                 4
               </div>
-              <span className="text-sm font-medium text-slate-400">Payment</span>
+              <span className="hidden md:block text-sm font-medium text-slate-400">Payment</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 lg:p-8 bg-slate-50">
+      <main className="flex-1 p-4 md:p-6 lg:p-8 bg-slate-50">
         <div className="max-w-4xl mx-auto">
           {/* Selected Quote Summary */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-6 mb-6 shadow-sm">
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-lg font-bold text-slate-900 mb-1">Selected Quote</h2>
@@ -491,18 +491,19 @@ export default function CheckoutPage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-4 mt-8">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4 mt-8">
             <Button
               onClick={() => router.push("/fetch-quotes")}
               variant="outline"
               disabled={submitting}
+              className="w-full sm:w-auto"
             >
               Back to Quotes
             </Button>
             <Button
               onClick={handleSubmit}
               disabled={submitting}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               {submitting ? (
                 <>
