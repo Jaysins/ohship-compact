@@ -9,7 +9,7 @@ import { getShipment, updateShipment } from "@/lib/api/shipments"
 import { getPaymentMethods, initiatePayment, uploadPaymentProof } from "@/lib/api/payments"
 import { formatCurrency } from "@/lib/utils/format"
 import { handleApiError } from "@/lib/utils/error-handler"
-import { LoadingSpinner, Button, Input, Badge, Select } from "@/components/ui"
+import { LoadingSpinner, Button, Input, Badge, Select, AddressCard } from "@/components/ui"
 import { toast } from "sonner"
 
 export default function PaymentPage() {
@@ -187,9 +187,11 @@ export default function PaymentPage() {
         toast.success("Payment proof uploaded successfully!")
         toast.info("Your payment is being verified. You will receive a confirmation email shortly.")
 
+
         // Redirect to success page or dashboard
         setTimeout(() => {
-          router.push(`/shipment/${shipmentId}/success`)
+          
+          router.push(`/shipment/${shipment?.code}/success`)
         }, 2000)
       }
     } catch (error: any) {
@@ -243,7 +245,7 @@ export default function PaymentPage() {
                 <div>
                   <h3 className="text-lg font-bold text-slate-900 mb-2">Payment Instructions</h3>
                   <p className="text-slate-700">
-                    Please transfer <strong>{formatCurrency(shipment.final_price, shipment.currency)}</strong> to the bank account below.
+                    Please transfer <strong>{formatCurrency(shipment.final_price, shipment.currency)}</strong> to the bank account below. 
                     After making the transfer, upload your payment proof to complete the process.
                   </p>
                 </div>
@@ -289,7 +291,7 @@ export default function PaymentPage() {
                 </div>
                 {bankDetails.reference && (
                   <div className="flex justify-between items-center py-3 bg-yellow-50 -mx-6 px-6 border-t border-yellow-200">
-                    <span className="text-slate-600">Reference (Optional)</span>
+                    <span className="text-slate-600">Reference</span>
                     <span className="font-mono text-slate-900">{bankDetails.reference}</span>
                   </div>
                 )}
@@ -383,46 +385,63 @@ export default function PaymentPage() {
       </div>
 
       {/* Progress Indicator */}
-      <div className="border-b border-slate-200 bg-slate-50 px-6 py-4">
+      <div className="border-b border-slate-200 bg-slate-50 px-4 md:px-6 py-4">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+            <div className="flex flex-col items-center gap-1 md:flex-row md:gap-2">
+              <div className="h-8 w-8 md:h-9 md:w-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                 ✓
               </div>
-              <span className="text-sm font-medium text-slate-700">Details</span>
+              <span className="hidden md:block text-sm font-medium text-slate-700">Route</span>
             </div>
-            <div className="flex-1 h-1 bg-primary mx-4"></div>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+            <div className="flex-1 h-1 bg-primary mx-2 md:mx-3"></div>
+            <div className="flex flex-col items-center gap-1 md:flex-row md:gap-2">
+              <div className="h-8 w-8 md:h-9 md:w-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                 ✓
               </div>
-              <span className="text-sm font-medium text-slate-700">Quote</span>
+              <span className="hidden md:block text-sm font-medium text-slate-700">Details</span>
             </div>
-            <div className="flex-1 h-1 bg-primary mx-4"></div>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+            <div className="flex-1 h-1 bg-primary mx-2 md:mx-3"></div>
+            <div className="flex flex-col items-center gap-1 md:flex-row md:gap-2">
+              <div className="h-8 w-8 md:h-9 md:w-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                 ✓
               </div>
-              <span className="text-sm font-medium text-slate-700">Shipment</span>
+              <span className="hidden md:block text-sm font-medium text-slate-700">Quote</span>
             </div>
-            <div className="flex-1 h-1 bg-primary mx-4"></div>
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
+            <div className="flex-1 h-1 bg-primary mx-2 md:mx-3"></div>
+            <div className="flex flex-col items-center gap-1 md:flex-row md:gap-2">
+              <div className="h-8 w-8 md:h-9 md:w-9 rounded-full bg-primary text-white flex items-center justify-center text-sm font-bold">
                 4
               </div>
-              <span className="text-sm font-medium text-slate-900">Payment</span>
+              <span className="hidden md:block text-sm font-medium text-slate-900">Payment</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 lg:p-8 bg-slate-50">
+      <main className="flex-1 p-4 md:p-6 lg:p-8 bg-slate-50">
         <div className="max-w-4xl mx-auto">
           {/* Order Summary */}
-          <div className="bg-white rounded-xl border border-slate-200 p-6 mb-6 shadow-sm">
+          <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-6 mb-6 shadow-sm">
             <h2 className="text-lg font-bold text-slate-900 mb-4">Order Summary</h2>
+
+            {/* Shipment Route */}
+            <div className="mb-6 pb-6 border-b border-slate-200">
+              <h3 className="text-sm font-bold text-slate-900 mb-4">Shipment Route</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <AddressCard
+                  title="From"
+                  address={shipment.origin_address}
+                  icon="📤"
+                />
+                <AddressCard
+                  title="To"
+                  address={shipment.destination_address}
+                  icon="📥"
+                />
+              </div>
+            </div>
 
             {/* Shipment Info */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 pb-6 border-b border-slate-200">
@@ -437,6 +456,45 @@ export default function PaymentPage() {
               <div>
                 <p className="text-xs text-slate-600 mb-1">Service</p>
                 <Badge variant="info">{shipment.service_type}</Badge>
+              </div>
+            </div>
+
+            {/* Items */}
+            <div className="mb-6 pb-6 border-b border-slate-200">
+              <h3 className="text-sm font-bold text-slate-900 mb-3">Items ({shipment.items.length})</h3>
+              <div className="space-y-3">
+                {shipment.items.map((item, idx) => (
+                  <div key={idx} className="bg-slate-50 rounded-lg p-3">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex-1">
+                        <p className="font-semibold text-slate-900">{item.description}</p>
+                        <p className="text-xs text-slate-600 mt-1">Category: {item.category_name}</p>
+                      </div>
+                      <Badge variant="default" className="ml-2">{item.package_type}</Badge>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-xs">
+                      <div>
+                        <span className="text-slate-600">Qty:</span>
+                        <span className="ml-1 font-semibold text-slate-900">{item.quantity}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">Weight:</span>
+                        <span className="ml-1 font-semibold text-slate-900">{item.weight}kg</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-600">Value:</span>
+                        <span className="ml-1 font-semibold text-slate-900">
+                          {formatCurrency(item.declared_value, shipment.currency)}
+                        </span>
+                      </div>
+                    </div>
+                    {(item.length || item.width || item.height) && (
+                      <div className="mt-2 text-xs text-slate-600">
+                        Dimensions: {item.length}×{item.width}×{item.height} cm
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -475,7 +533,7 @@ export default function PaymentPage() {
           </div>
 
           {/* Payer Information */}
-          <div className="bg-white rounded-xl border-2 border-slate-200 p-6 mb-6">
+          <div className="bg-white rounded-xl border-2 border-slate-200 p-4 md:p-6 mb-6">
             <h3 className="text-lg font-bold text-slate-900 mb-4">Payer Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Input
@@ -502,7 +560,7 @@ export default function PaymentPage() {
           </div>
 
           {/* Payment Method Selection */}
-          <div className="bg-white rounded-xl border-2 border-slate-200 p-6 mb-6">
+          <div className="bg-white rounded-xl border-2 border-slate-200 p-4 md:p-6 mb-6">
             <h3 className="text-lg font-bold text-slate-900 mb-4">Payment Method</h3>
             <Select
               label="Select Payment Method"
@@ -527,18 +585,19 @@ export default function PaymentPage() {
           </div>
 
           {/* Action Buttons */}
-          <div className="flex gap-4">
+          <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
             <Button
               onClick={() => router.push("/checkout")}
               variant="outline"
               disabled={submitting}
+              className="w-full sm:w-auto"
             >
               Back
             </Button>
             <Button
               onClick={handleInitiatePayment}
               disabled={!selectedPaymentMethod || submitting}
-              className="flex-1"
+              className="w-full sm:flex-1"
             >
               {submitting ? (
                 <>

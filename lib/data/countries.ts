@@ -1,141 +1,93 @@
 /**
- * Countries and states data
- * Common countries and their states for dropdowns
+ * Countries, states, and cities data
+ * Using country-state-city package for comprehensive global coverage
  */
+
+import { Country as CSCCountry, State as CSCState, City as CSCCity } from 'country-state-city'
 
 export interface Country {
   code: string
   name: string
-  states: string[]
+  states?: State[]
 }
 
-export const COUNTRIES: Country[] = [
-  {
-    code: 'NG',
-    name: 'Nigeria',
-    states: [
-      'abia',
-      'abuja',
-      'adamawa',
-      'akwa ibom',
-      'anambra',
-      'bauchi',
-      'bayelsa',
-      'benue',
-      'borno',
-      'cross river',
-      'delta',
-      'ebonyi',
-      'edo',
-      'ekiti',
-      'enugu',
-      'gombe',
-      'imo',
-      'jigawa',
-      'kaduna',
-      'kano',
-      'katsina',
-      'kebbi',
-      'kogi',
-      'kwara',
-      'lagos',
-      'nasarawa',
-      'niger',
-      'ogun',
-      'ondo',
-      'osun',
-      'oyo',
-      'plateau',
-      'rivers',
-      'sokoto',
-      'taraba',
-      'yobe',
-      'zamfara',
-    ],
-  },
-  {
-    code: 'US',
-    name: 'United States',
-    states: [
-      'alabama',
-      'alaska',
-      'arizona',
-      'arkansas',
-      'california',
-      'colorado',
-      'connecticut',
-      'delaware',
-      'florida',
-      'georgia',
-      'hawaii',
-      'idaho',
-      'illinois',
-      'indiana',
-      'iowa',
-      'kansas',
-      'kentucky',
-      'louisiana',
-      'maine',
-      'maryland',
-      'massachusetts',
-      'michigan',
-      'minnesota',
-      'mississippi',
-      'missouri',
-      'montana',
-      'nebraska',
-      'nevada',
-      'new hampshire',
-      'new jersey',
-      'new mexico',
-      'new york',
-      'north carolina',
-      'north dakota',
-      'ohio',
-      'oklahoma',
-      'oregon',
-      'pennsylvania',
-      'rhode island',
-      'south carolina',
-      'south dakota',
-      'tennessee',
-      'texas',
-      'utah',
-      'vermont',
-      'virginia',
-      'washington',
-      'west virginia',
-      'wisconsin',
-      'wyoming',
-    ],
-  },
-  {
-    code: 'GB',
-    name: 'United Kingdom',
-    states: [
-      'england',
-      'scotland',
-      'wales',
-      'northern ireland',
-    ],
-  },
-  {
-    code: 'CA',
-    name: 'Canada',
-    states: [
-      'alberta',
-      'british columbia',
-      'manitoba',
-      'new brunswick',
-      'newfoundland and labrador',
-      'nova scotia',
-      'ontario',
-      'prince edward island',
-      'quebec',
-      'saskatchewan',
-    ],
-  },
-]
+export interface State {
+  code: string
+  name: string
+  countryCode: string
+  cities?: City[]
+}
+
+export interface City {
+  name: string
+  stateCode: string
+  countryCode: string
+}
+
+/**
+ * Get all countries
+ */
+export const getAllCountries = (): Country[] => {
+  return CSCCountry.getAllCountries().map(country => ({
+    code: country.isoCode,
+    name: country.name,
+  }))
+}
+
+/**
+ * Get states for a specific country
+ */
+export const getStatesOfCountry = (countryCode: string): State[] => {
+  return CSCState.getStatesOfCountry(countryCode).map(state => ({
+    code: state.isoCode,
+    name: state.name,
+    countryCode: state.countryCode,
+  }))
+}
+
+/**
+ * Get cities for a specific state in a country
+ */
+export const getCitiesOfState = (countryCode: string, stateCode: string): City[] => {
+  return CSCCity.getCitiesOfState(countryCode, stateCode).map(city => ({
+    name: city.name,
+    stateCode: city.stateCode,
+    countryCode: city.countryCode,
+  }))
+}
+
+/**
+ * Get a specific country by code
+ */
+export const getCountryByCode = (countryCode: string): Country | null => {
+  const country = CSCCountry.getCountryByCode(countryCode)
+  if (!country) return null
+
+  return {
+    code: country.isoCode,
+    name: country.name,
+  }
+}
+
+/**
+ * Get a specific state by code
+ */
+export const getStateByCode = (countryCode: string, stateCode: string): State | null => {
+  const state = CSCState.getStateByCodeAndCountry(stateCode, countryCode)
+  if (!state) return null
+
+  return {
+    code: state.isoCode,
+    name: state.name,
+    countryCode: state.countryCode,
+  }
+}
+
+/**
+ * Legacy COUNTRIES array for backward compatibility
+ * Returns a limited set of countries with their states
+ */
+export const COUNTRIES: Country[] = getAllCountries()
 
 export const CURRENCIES = [
   { code: 'NGN', name: 'Nigerian Naira (₦)' },
@@ -150,4 +102,6 @@ export const PACKAGE_TYPES = [
   { value: 'pallet', label: 'Pallet' },
   { value: 'tube', label: 'Tube' },
   { value: 'pak', label: 'Pak' },
+    { value: 'other', label: 'Other' },
+
 ] as const

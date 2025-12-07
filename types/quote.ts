@@ -2,6 +2,16 @@
  * Quote type definitions
  */
 
+export interface ShipmentItemUI {
+  id: string // For React keys only
+  categoryId: string
+  description: string
+  packageType: "envelope" | "box" | "pallet" | "tube" | "pak" | "other"
+  quantity: string
+  weight: string
+  dimensions: { length: string; width: string; height: string }
+  declaredValue: string
+}
 export interface QuoteItem {
   category_id: string
   category_name: string
@@ -9,7 +19,7 @@ export interface QuoteItem {
   category_hs_code: string
   category_group_tag: string
   description: string
-  package_type: 'envelope' | 'box' | 'pallet' | 'tube' | 'pak'
+  package_type: 'envelope' | 'box' | 'pallet' | 'tube' | 'pak' | 'other'
   quantity: number
   weight: number
   length?: number

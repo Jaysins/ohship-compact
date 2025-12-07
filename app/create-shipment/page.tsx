@@ -6,11 +6,12 @@ import { useRouter } from "next/navigation"
 import { categoriesApi } from "@/lib/api/categories"
 import { quotesApi } from "@/lib/api/quotes"
 import type { Category } from "@/types/category"
-import type { QuoteRequest } from "@/types/quote"
-import { COUNTRIES, CURRENCIES, PACKAGE_TYPES } from "@/lib/data/countries"
+import type { QuoteItem, QuoteRequest, ShipmentItemUI } from "@/types/quote"
+import { COUNTRIES, CURRENCIES, PACKAGE_TYPES, getStatesOfCountry, getCitiesOfState } from "@/lib/data/countries"
 import { handleApiError, showSuccess } from "@/lib/utils/error-handler"
 import { setStorageItem, getStorageItem, StorageKey } from "@/lib/utils/storage"
-import { Button, Input, Select, LoadingSpinner } from "@/components/ui"
+import { Button, Input, Select, LoadingSpinner, CityAutocomplete } from "@/components/ui"
+
 
 export default function CreateShipmentPage() {
   const router = useRouter()
@@ -32,22 +33,37 @@ export default function CreateShipmentPage() {
   const [destState, setDestState] = useState("")
   const [destCity, setDestCity] = useState("")
 
-  // Form state - Item details
-  const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
-  const [itemDescription, setItemDescription] = useState("")
-  const [packageType, setPackageType] = useState<"envelope" | "box" | "pallet" | "tube" | "pak">("box")
-  const [quantity, setQuantity] = useState("1")
-  const [weight, setWeight] = useState("")
-  const [dimensions, setDimensions] = useState({ length: "", width: "", height: "" })
-  const [declaredValue, setDeclaredValue] = useState("")
+  // Form state - Items (multiple)
+  const [items, setItems] = useState<ShipmentItemUI[]>([
+    {
+      id: crypto.randomUUID(),
+      categoryId: "",
+      description: "",
+      packageType: "box",
+      quantity: "1",
+      weight: "",
+      dimensions: { length: "", width: "", height: "" },
+      declaredValue: "",
+    },
+  ])
 
   // Form state - Other
   const [currency, setCurrency] = useState("NGN")
   const [isInsured, setIsInsured] = useState(true)
 
-  // Get available states for selected countries
-  const originStates = COUNTRIES.find((c) => c.code === originCountry)?.states || []
-  const destStates = COUNTRIES.find((c) => c.code === destCountry)?.states || []
+  // Get available states and cities for selected countries
+  const originStates = getStatesOfCountry(originCountry)
+  const destStates = getStatesOfCountry(destCountry)
+  const originCities = originState ? getCitiesOfState(originCountry, originState) : []
+  const destCities = destState ? getCitiesOfState(destCountry, destState) : []
+  
+  const PACKAGE_DEFAULT_WEIGHTS: Record<string, number> = {
+    envelope: 0.2,
+    box: 1,
+    pallet: 10,
+    tube: 0.5,
+    pak: 0.3,
+  }
 
   // Load categories on mount
   useEffect(() => {
@@ -65,8 +81,10 @@ export default function CreateShipmentPage() {
         }, [])
 
         setCategories(uniqueCategories)
-        if (uniqueCategories.length > 0) {
-          setSelectedCategory(uniqueCategories[0])
+        
+        // Set default category for first item
+        if (uniqueCategories.length > 0 && items[0]) {
+          updateItem(0, { categoryId: uniqueCategories[0].id })
         }
       } catch (error) {
         handleApiError(error)
@@ -88,22 +106,15 @@ export default function CreateShipmentPage() {
       setDestCountry(draft.destCountry || "US")
       setDestState(draft.destState || "")
       setDestCity(draft.destCity || "")
-      setItemDescription(draft.itemDescription || "")
-      setPackageType(draft.packageType || "box")
-      setQuantity(draft.quantity || "1")
-      setWeight(draft.weight || "")
-      setDimensions(draft.dimensions || { length: "", width: "", height: "" })
-      setDeclaredValue(draft.declaredValue || "")
       setCurrency(draft.currency || "NGN")
       setIsInsured(draft.isInsured !== undefined ? draft.isInsured : true)
 
-      // Restore selected category
-      if (draft.categoryId && categories.length > 0) {
-        const cat = categories.find(c => c.id === draft.categoryId)
-        if (cat) setSelectedCategory(cat)
+      // Restore items
+      if (draft.items && Array.isArray(draft.items)) {
+        setItems(draft.items)
       }
     }
-  }, [categories])
+  }, [])
 
   // Auto-save draft
   useEffect(() => {
@@ -115,13 +126,7 @@ export default function CreateShipmentPage() {
         destCountry,
         destState,
         destCity,
-        categoryId: selectedCategory?.id,
-        itemDescription,
-        packageType,
-        quantity,
-        weight,
-        dimensions,
-        declaredValue,
+        items,
         currency,
         isInsured,
       }
@@ -129,14 +134,39 @@ export default function CreateShipmentPage() {
     }, 1000)
 
     return () => clearTimeout(saveTimer)
-  }, [originCountry, originState, originCity, destCountry, destState, destCity, selectedCategory, itemDescription, packageType, quantity, weight, dimensions, declaredValue, currency, isInsured])
+  }, [originCountry, originState, originCity, destCountry, destState, destCity, items, currency, isInsured])
 
-  // Handle category change
-  const handleCategoryChange = (categoryId: string) => {
-    const category = categories.find((c) => c.id === categoryId)
-    if (category) {
-      setSelectedCategory(category)
+  // Item management functions
+  const addItem = () => {
+    const newItem: ShipmentItemUI = {
+      id: crypto.randomUUID(),
+      categoryId: categories[0]?.id || "",
+      description: "",
+      packageType: "box",
+      quantity: "1",
+      weight: "1",
+      dimensions: { length: "", width: "", height: "" },
+      declaredValue: "",
     }
+    setItems([...items, newItem])
+  }
+
+  const removeItem = (index: number) => {
+    if (items.length > 1) {
+      setItems(items.filter((_, i) => i !== index))
+    }
+  }
+
+  const updateItem = (index: number, updates: Partial<ShipmentItemUI>) => {
+    setItems(items.map((item, i) => (i === index ? { ...item, ...updates } : item)))
+  }
+
+  const handlePackageTypeChange = (index: number, value: string) => {
+    const defaultWeight = PACKAGE_DEFAULT_WEIGHTS[value]
+    updateItem(index, {
+      packageType: value as any,
+      weight: defaultWeight ? defaultWeight.toString() : items[index].weight,
+    })
   }
 
   const handleGetQuotes = async () => {
@@ -158,58 +188,65 @@ export default function CreateShipmentPage() {
       return
     }
 
-    if (!selectedCategory) {
-      handleApiError(new Error("Please select item category"))
-      return
-    }
-    if (!itemDescription.trim()) {
-      handleApiError(new Error("Please enter item description"))
-      return
-    }
-    if (!weight || parseFloat(weight) <= 0) {
+    // Validate package details
+    const item = items[0]
+    if (!item.weight || parseFloat(item.weight) <= 0) {
       handleApiError(new Error("Please enter a valid weight"))
       return
     }
-    if (!quantity || parseInt(quantity) <= 0) {
+    if (!item.quantity || parseInt(item.quantity) <= 0) {
       handleApiError(new Error("Please enter a valid quantity"))
       return
     }
-    if (!declaredValue || parseFloat(declaredValue) <= 0) {
-      handleApiError(new Error("Please enter declared value"))
+    if (!item.declaredValue || parseFloat(item.declaredValue) <= 0) {
+      handleApiError(new Error("Please enter a valid declared value"))
       return
     }
 
     setLoading(true)
 
     try {
+      // Convert state codes to state names for the API request
+      const originStateName = originStates.find(s => s.code === originState)?.name || originState
+      const destStateName = destStates.find(s => s.code === destState)?.name || destState
+
       const quoteRequest: QuoteRequest = {
         origin: {
           country: originCountry,
-          state: originState.toLowerCase(),
+          state: originStateName.toLowerCase(),
           city: originCity.toLowerCase() || undefined,
         },
         destination: {
           country: destCountry,
-          state: destState.toLowerCase(),
+          state: destStateName.toLowerCase(),
           city: destCity.toLowerCase() || undefined,
         },
-        items: [
-          {
-            category_id: selectedCategory.id,
-            category_name: selectedCategory.name,
-            category_description: selectedCategory.description,
-            category_hs_code: selectedCategory.hs_code,
-            category_group_tag: selectedCategory.group_tag,
-            description: itemDescription,
-            package_type: packageType,
-            quantity: parseInt(quantity),
-            weight: parseFloat(weight),
-            length: dimensions.length ? parseFloat(dimensions.length) : undefined,
-            width: dimensions.width ? parseFloat(dimensions.width) : undefined,
-            height: dimensions.height ? parseFloat(dimensions.height) : undefined,
-            declared_value: parseFloat(declaredValue),
-          },
-        ],
+        items: items.map((item): QuoteItem => {
+          // Use default category (first one) since we're not collecting this on the form
+          const category = categories[0] || {
+            id: "default",
+            name: "General Item",
+            description: "General shipment item",
+            hs_code: "0000.00.00",
+            group_tag: "general"
+          }
+
+          return {
+            category_id: category.id,
+            category_name: category.name,
+            category_description: category.description,
+            category_hs_code: category.hs_code,
+            category_group_tag: category.group_tag,
+            description: "Shipment package", // Default description
+            package_type: "box", // Default package type
+            quantity: parseInt(item.quantity),
+            weight: parseFloat(item.weight),
+            length: undefined, // No dimensions collected
+            width: undefined,
+            height: undefined,
+            declared_value: parseFloat(item.declaredValue),
+          }
+        }),
         currency: currency,
         is_insured: isInsured,
       }
@@ -306,6 +343,7 @@ export default function CreateShipmentPage() {
                     onChange={(e) => {
                       setOriginCountry(e.target.value)
                       setOriginState("")
+                      setOriginCity("")
                     }}
                     options={COUNTRIES.map((c) => ({ value: c.code, label: c.name }))}
                   />
@@ -313,18 +351,23 @@ export default function CreateShipmentPage() {
                   <Select
                     label="State"
                     value={originState}
-                    onChange={(e) => setOriginState(e.target.value)}
+                    onChange={(e) => {
+                      setOriginState(e.target.value)
+                      setOriginCity("")
+                    }}
                     options={[
                       { value: "", label: "Select state..." },
-                      ...originStates.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) })),
+                      ...originStates.map((s) => ({ value: s.code, label: s.name })),
                     ]}
                   />
 
-                  <Input
+                  <CityAutocomplete
                     label="City"
                     value={originCity}
-                    onChange={(e) => setOriginCity(e.target.value)}
+                    onChange={setOriginCity}
+                    cities={originCities}
                     placeholder="Enter city"
+                    disabled={!originState}
                   />
                 </div>
 
@@ -338,6 +381,7 @@ export default function CreateShipmentPage() {
                     onChange={(e) => {
                       setDestCountry(e.target.value)
                       setDestState("")
+                      setDestCity("")
                     }}
                     options={COUNTRIES.map((c) => ({ value: c.code, label: c.name }))}
                   />
@@ -345,18 +389,23 @@ export default function CreateShipmentPage() {
                   <Select
                     label="State"
                     value={destState}
-                    onChange={(e) => setDestState(e.target.value)}
+                    onChange={(e) => {
+                      setDestState(e.target.value)
+                      setDestCity("")
+                    }}
                     options={[
                       { value: "", label: "Select state..." },
-                      ...destStates.map((s) => ({ value: s, label: s.charAt(0).toUpperCase() + s.slice(1) })),
+                      ...destStates.map((s) => ({ value: s.code, label: s.name })),
                     ]}
                   />
 
-                  <Input
+                  <CityAutocomplete
                     label="City"
                     value={destCity}
-                    onChange={(e) => setDestCity(e.target.value)}
+                    onChange={setDestCity}
+                    cities={destCities}
                     placeholder="Enter city"
+                    disabled={!destState}
                   />
                 </div>
               </div>
@@ -364,44 +413,15 @@ export default function CreateShipmentPage() {
 
             {/* Package Details Card */}
             <div className="rounded-xl border border-slate-200 bg-white p-6 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
-              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">Package Information</h2>
-              <div className="mt-6 flex flex-col gap-6">
-                <Select
-                  label="Item Category"
-                  value={selectedCategory?.id || ""}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
-                  options={categories.map((c) => ({ value: c.id, label: c.name, key: c.id }))}
-                />
+              <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50 mb-6">Package Details</h2>
 
-                {selectedCategory && (
-                  <div className="rounded-lg bg-slate-50 dark:bg-slate-800 p-3 text-sm">
-                    <p className="text-slate-600 dark:text-slate-400">{selectedCategory.description}</p>
-                    <p className="text-slate-500 dark:text-slate-500 text-xs mt-1">
-                      HS Code: {selectedCategory.hs_code}
-                    </p>
-                  </div>
-                )}
-
-                <Input
-                  label="Item Description"
-                  value={itemDescription}
-                  onChange={(e) => setItemDescription(e.target.value)}
-                  placeholder="e.g., Leather backpack with laptop compartment"
-                />
-
-                <Select
-                  label="Package Type"
-                  value={packageType}
-                  onChange={(e) => setPackageType(e.target.value as any)}
-                  options={PACKAGE_TYPES.map((t) => ({ value: t.value, label: t.label }))}
-                />
-
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
+              <div className="flex flex-col gap-6">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
                   <Input
                     label="Quantity"
                     type="number"
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
+                    value={items[0].quantity}
+                    onChange={(e) => updateItem(0, { quantity: e.target.value })}
                     placeholder="1"
                     min="1"
                     step="1"
@@ -410,60 +430,21 @@ export default function CreateShipmentPage() {
                   <Input
                     label="Weight (kg)"
                     type="number"
-                    value={weight}
-                    onChange={(e) => setWeight(e.target.value)}
+                    value={items[0].weight}
+                    onChange={(e) => updateItem(0, { weight: e.target.value })}
                     placeholder="2.5"
                     step="0.1"
                     min="0.1"
                   />
-                </div>
 
-                <div>
-                  <p className="pb-3 text-base font-medium text-slate-800 dark:text-slate-200">Dimensions (cm) - Optional</p>
-                  <div className="grid grid-cols-3 gap-3">
-                    <Input
-                      type="number"
-                      value={dimensions.length}
-                      onChange={(e) => setDimensions({ ...dimensions, length: e.target.value })}
-                      placeholder="Length"
-                      step="0.1"
-                      min="0"
-                    />
-                    <Input
-                      type="number"
-                      value={dimensions.width}
-                      onChange={(e) => setDimensions({ ...dimensions, width: e.target.value })}
-                      placeholder="Width"
-                      step="0.1"
-                      min="0"
-                    />
-                    <Input
-                      type="number"
-                      value={dimensions.height}
-                      onChange={(e) => setDimensions({ ...dimensions, height: e.target.value })}
-                      placeholder="Height"
-                      step="0.1"
-                      min="0"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   <Input
                     label="Declared Value"
                     type="number"
-                    value={declaredValue}
-                    onChange={(e) => setDeclaredValue(e.target.value)}
+                    value={items[0].declaredValue}
+                    onChange={(e) => updateItem(0, { declaredValue: e.target.value })}
                     placeholder="1000"
                     step="0.01"
                     min="0.01"
-                  />
-
-                  <Select
-                    label="Currency"
-                    value={currency}
-                    onChange={(e) => setCurrency(e.target.value)}
-                    options={CURRENCIES.map((c) => ({ value: c.code, label: c.name }))}
                   />
                 </div>
 
@@ -487,7 +468,7 @@ export default function CreateShipmentPage() {
 
       {/* Sticky Footer CTA */}
       <footer className="sticky bottom-0 mt-auto w-full border-t border-slate-200 bg-white/80 py-4 backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/80">
-        <div className="mx-auto flex max-w-3xl justify-end px-4">
+        <div className="mx-auto flex max-w-3xl justify-end items-center px-4">
           <Button
             onClick={handleGetQuotes}
             loading={loading}

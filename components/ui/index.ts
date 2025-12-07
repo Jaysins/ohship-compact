@@ -31,3 +31,7 @@ export { Skeleton } from './skeleton'
 export type { SkeletonProps } from './skeleton'
 
 export { ToastProvider } from './toast-provider'
+
+export { CityAutocomplete } from './city-autocomplete'
+
+export { AddressCard } from './address-card'

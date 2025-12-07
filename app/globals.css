@@ -4,13 +4,23 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  /* Brand Theme Colors - Injected by BrandThemeProvider */
+  --color-primary: 99, 102, 241; /* RGB values for primary color */
+  --color-secondary: 139, 92, 246;
+  --color-success: 34, 197, 94;
+  --color-warning: 245, 158, 11;
+  --color-danger: 239, 68, 68;
+  --color-info: 59, 130, 246;
+  --font-family: 'Inter';
+  --border-radius: 0.75rem;
+
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: #00c49a;
+  --primary: rgb(var(--color-primary));
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -18,8 +28,8 @@
   --muted-foreground: oklch(0.556 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.577 0.245 27.325);
+  --destructive: rgb(var(--color-danger));
+  --destructive-foreground: oklch(0.985 0 0);
   --border: #e5e7eb;
   --input: #e5e7eb;
   --ring: oklch(0.708 0 0);
@@ -28,7 +38,7 @@
   --chart-3: oklch(0.398 0.07 227.392);
   --chart-4: oklch(0.828 0.189 84.429);
   --chart-5: oklch(0.769 0.188 70.08);
-  --radius: 0.625rem;
+  --radius: var(--border-radius);
   --sidebar: oklch(0.985 0 0);
   --sidebar-foreground: oklch(0.145 0 0);
   --sidebar-primary: oklch(0.205 0 0);
@@ -55,16 +65,16 @@
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.145 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: #00c49a;
-  --primary-foreground: oklch(0.205 0 0);
+  --primary: rgb(var(--color-primary));
+  --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
   --muted: oklch(0.269 0 0);
   --muted-foreground: oklch(0.708 0 0);
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.396 0.141 25.723);
-  --destructive-foreground: oklch(0.637 0.237 25.331);
+  --destructive: rgb(var(--color-danger));
+  --destructive-foreground: oklch(0.985 0 0);
   --border: #1f2937;
   --input: #1f2937;
   --ring: oklch(0.439 0 0);

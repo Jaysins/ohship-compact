@@ -13,7 +13,7 @@ const testimonials = [
     avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=48&h=48&fit=crop",
   },
   {
-    quote: "Exceptional service and unbeatable quotes. ShipLogic has streamlined our entire logistics operation.",
+    quote: "Exceptional service and unbeatable quotes. This platform has streamlined our entire logistics operation.",
     author: "Emily White",
     company: "Global Goods",
     avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=48&h=48&fit=crop",
@@ -22,32 +22,32 @@ const testimonials = [
 
 export default function TestimonialsSection() {
   return (
-    <section className="bg-background-secondary-light dark:bg-background-secondary-dark py-20 lg:py-24">
-      <div className="container mx-auto px-4">
-        <div className="flex flex-col gap-12">
-          <h2 className="text-text-primary-light dark:text-text-primary-dark text-3xl font-bold leading-tight tracking-tight text-center">
+    <section className="bg-background-secondary-light dark:bg-background-secondary-dark py-12 md:py-20 lg:py-24">
+      <div className="container mx-auto px-6 lg:px-8">
+        <div className="flex flex-col gap-10 md:gap-12">
+          <h2 className="text-text-primary-light dark:text-text-primary-dark text-2xl sm:text-3xl md:text-4xl font-bold leading-tight tracking-tight text-center px-4">
             Trusted by Leading Businesses
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
             {testimonials.map((testimonial, index) => (
               <div
                 key={index}
-                className="flex flex-col gap-4 rounded-xl bg-background-light dark:bg-background-dark p-6 shadow-sm"
+                className="flex flex-col gap-4 rounded-xl bg-background-light dark:bg-background-dark p-6 md:p-8 shadow-sm hover:shadow-md transition-shadow"
               >
-                <p className="text-text-primary-light dark:text-text-primary-dark text-lg font-medium leading-normal flex-grow">
+                <p className="text-text-primary-light dark:text-text-primary-dark text-base md:text-lg font-medium leading-relaxed flex-grow">
                   "{testimonial.quote}"
                 </p>
                 <div className="flex items-center gap-4">
                   <img
-                    className="w-12 h-12 rounded-full object-cover"
+                    className="w-12 h-12 md:w-14 md:h-14 rounded-full object-cover flex-shrink-0"
                     src={testimonial.avatar || "/placeholder.svg"}
                     alt={testimonial.author}
                   />
                   <div>
-                    <p className="text-text-primary-light dark:text-text-primary-dark font-bold">
+                    <p className="text-text-primary-light dark:text-text-primary-dark text-sm md:text-base font-bold">
                       {testimonial.author}
                     </p>
-                    <p className="text-text-secondary-light dark:text-text-secondary-dark text-sm">
+                    <p className="text-text-secondary-light dark:text-text-secondary-dark text-xs md:text-sm">
                       {testimonial.company}
                     </p>
                   </div>
