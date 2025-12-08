@@ -50,6 +50,7 @@ export interface ShipmentItem {
 
 export interface CreateShipmentRequest {
   quote_id: string
+  shipment_id?: string | null
   channel_code: string
   is_insured: boolean
   save_origin_address: boolean
@@ -150,4 +151,15 @@ export interface ShipmentResponse {
 
 export interface UpdateShipmentRequest {
   selected_payment_method?: string
+  quote_id?: string
+  channel_code?: string
+  is_insured?: boolean
+  save_origin_address?: boolean
+  save_destination_address?: boolean
+  items?: ShipmentItem[]
+  origin_address?: Address
+  destination_address?: Address
+  pickup_type?: 'scheduled_pickup' | 'drop_off'
+  pickup_scheduled_at?: string
+  customer_notes?: string | null
 }

@@ -9,7 +9,6 @@ import type { Category } from "@/types/category"
 import type { QuoteItem, QuoteRequest, ShipmentItemUI } from "@/types/quote"
 import { COUNTRIES, CURRENCIES, PACKAGE_TYPES, getStatesOfCountry, getCitiesOfState } from "@/lib/data/countries"
 import { handleApiError, showSuccess } from "@/lib/utils/error-handler"
-import { setStorageItem, getStorageItem, StorageKey } from "@/lib/utils/storage"
 import { Button, Input, Select, LoadingSpinner, CityAutocomplete } from "@/components/ui"
 
 
@@ -96,45 +95,7 @@ export default function CreateShipmentPage() {
     loadCategories()
   }, [])
 
-  // Load draft from localStorage
-  useEffect(() => {
-    const draft = getStorageItem<any>(StorageKey.SHIPMENT_DRAFT)
-    if (draft) {
-      setOriginCountry(draft.originCountry || "NG")
-      setOriginState(draft.originState || "")
-      setOriginCity(draft.originCity || "")
-      setDestCountry(draft.destCountry || "US")
-      setDestState(draft.destState || "")
-      setDestCity(draft.destCity || "")
-      setCurrency(draft.currency || "NGN")
-      setIsInsured(draft.isInsured !== undefined ? draft.isInsured : true)
-
-      // Restore items
-      if (draft.items && Array.isArray(draft.items)) {
-        setItems(draft.items)
-      }
-    }
-  }, [])
-
-  // Auto-save draft
-  useEffect(() => {
-    const saveTimer = setTimeout(() => {
-      const draft = {
-        originCountry,
-        originState,
-        originCity,
-        destCountry,
-        destState,
-        destCity,
-        items,
-        currency,
-        isInsured,
-      }
-      setStorageItem(StorageKey.SHIPMENT_DRAFT, draft)
-    }, 1000)
-
-    return () => clearTimeout(saveTimer)
-  }, [originCountry, originState, originCity, destCountry, destState, destCity, items, currency, isInsured])
+  // No draft loading - user must re-enter on refresh
 
   // Item management functions
   const addItem = () => {
@@ -252,16 +213,18 @@ export default function CreateShipmentPage() {
       }
 
       // Fetch quotes from API
-      const quotes = await quotesApi.fetchQuotes(quoteRequest)
+      const response = await quotesApi.fetchQuotes(quoteRequest)
 
-      // Store quotes and search params
-      setStorageItem(StorageKey.QUOTES_CACHE, quotes)
-      setStorageItem(StorageKey.QUOTE_SEARCH, quoteRequest)
+      if (response.status === "success") {
+        showSuccess(`Found ${response.data.rates.length} shipping quotes!`)
 
-      showSuccess(`Found ${quotes.length} shipping quotes!`)
+        // Backend returns the quote data with rates
+        // Store temporarily just to pass to next page (will be stored in context on selection)
+        sessionStorage.setItem('temp-quote-response', JSON.stringify(response.data))
 
-      // Navigate to fetch quotes page
-      router.push("/fetch-quotes")
+        // Navigate to fetch quotes page
+        router.push("/fetch-quotes")
+      }
     } catch (error) {
       handleApiError(error)
     } finally {

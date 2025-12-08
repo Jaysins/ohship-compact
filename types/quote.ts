@@ -42,6 +42,10 @@ export interface QuoteRequest {
   items: QuoteItem[]
   currency: string
   is_insured: boolean
+  shipment_id?: string | null
+  quote_id?: string | null
+  promo_code?: string | null
+  preferred_service_type?: string | null
 }
 
 export interface Quote {
@@ -97,5 +101,29 @@ export interface Quote {
 
 export interface QuoteResponse {
   status: 'success' | 'error'
-  data: Quote[]
+  message: string
+  data: {
+    origin: {
+      city: string
+      state: string
+      country: string
+      address_line_1: string | null
+      address_line_2: string | null
+      postal_code: string | null
+    }
+    destination: {
+      city: string
+      state: string
+      country: string
+      address_line_1: string | null
+      address_line_2: string | null
+      postal_code: string | null
+    }
+    items: QuoteItem[]
+    is_insured: boolean
+    promo_code: string | null
+    quote_id: string | null
+    preferred_service_type: string | null
+    rates: Quote[]
+  }
 }

@@ -1,14 +1,14 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import type { Quote, QuoteRequest, ShipmentItemUI, QuoteItem } from "@/types/quote"
 import type { CreateShipmentRequest, Address } from "@/types/shipment"
 import type { Category } from "@/types/category"
-import { getStorageItem, StorageKey } from "@/lib/utils/storage"
 import { formatCurrency } from "@/lib/utils/format"
-import { createShipment } from "@/lib/api/shipments"
+import { useQuote } from "@/lib/contexts/quote-context"
+import { createShipment, updateShipment } from "@/lib/api/shipments"
 import { categoriesApi } from "@/lib/api/categories"
 import { quotesApi } from "@/lib/api/quotes"
 import { handleApiError } from "@/lib/utils/error-handler"
@@ -18,6 +18,9 @@ import { toast } from "sonner"
 
 export default function CheckoutPage() {
   const router = useRouter()
+  const urlParams = useSearchParams()
+  const mode = urlParams.get('mode') // 'review' if coming back from payment
+  const { quoteData, selectedQuoteId: contextQuoteId, setQuoteData, setSelectedQuoteId } = useQuote()
 
   // State
   const [selectedQuote, setSelectedQuote] = useState<Quote | null>(null)
@@ -66,7 +69,8 @@ export default function CheckoutPage() {
   const [receiverCountry, setReceiverCountry] = useState("")
   const [receiverState, setReceiverState] = useState("")
   const [receiverCity, setReceiverCity] = useState("")
-
+  
+  const [shipmentId, setShipmentId] = useState(null)
   // Form state - Pickup
   const [pickupType, setPickupType] = useState<"scheduled_pickup" | "drop_off">("scheduled_pickup")
   const [pickupDate, setPickupDate] = useState("")
@@ -91,6 +95,12 @@ export default function CheckoutPage() {
   const senderCities = senderState ? getCitiesOfState(senderCountry, senderState) : []
   const receiverCities = receiverState ? getCitiesOfState(receiverCountry, receiverState) : []
 
+  // Debug: Log when items change
+  useEffect(() => {
+    console.log("Items state updated to:", items)
+    console.log("Number of items:", items.length)
+  }, [items])
+
   // Load categories on mount
   useEffect(() => {
     const loadCategories = async () => {
@@ -108,8 +118,12 @@ export default function CheckoutPage() {
 
         setCategories(uniqueCategories)
 
-        // Set default category for first item
-        if (uniqueCategories.length > 0 && items[0]) {
+        // Set default category for first item ONLY if not in review mode
+        // In review mode, items are loaded from sessionStorage and shouldn't be overwritten
+        // Also only set if categoryId is empty (new item)
+        const isReviewMode = urlParams.get('mode') === 'review'
+        if (!isReviewMode && uniqueCategories.length > 0 && items[0] && !items[0].categoryId) {
+          console.log("Setting default category for new item")
           updateItem(0, { categoryId: uniqueCategories[0].id })
         }
       } catch (error) {
@@ -120,58 +134,170 @@ export default function CheckoutPage() {
     }
 
     loadCategories()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Load initial data and search params
+  // Load initial data from sessionStorage and populate context
   useEffect(() => {
-    const initialQuote = getStorageItem<Quote>(StorageKey.SELECTED_QUOTE)
-    const cachedSearch = getStorageItem<QuoteRequest>(StorageKey.QUOTE_SEARCH)
+    // Check if coming back from payment page (review mode)
+    console.log("we in mode===>", mode)
+    if (mode === 'review') {
+      const createdShipmentDataStr = sessionStorage.getItem('created-shipment-data')
+      if (!createdShipmentDataStr) {
+        toast.error("Shipment data not found.")
+        router.push("/create-shipment")
+        return
+      }
 
-    if (!cachedSearch) {
+      try {
+        const { shipment, formData } = JSON.parse(createdShipmentDataStr)
+        // Prefill ALL form fields with previously entered data
+        setSenderName(formData.senderName)
+        setSenderEmail(formData.senderEmail)
+        setSenderPhone(formData.senderPhone)
+        setSenderAddress1(formData.senderAddress1)
+        setSenderAddress2(formData.senderAddress2 || "")
+        setSenderPostalCode(formData.senderPostalCode)
+
+        setReceiverName(formData.receiverName)
+        setReceiverEmail(formData.receiverEmail)
+        setReceiverPhone(formData.receiverPhone)
+        setReceiverAddress1(formData.receiverAddress1)
+        setReceiverAddress2(formData.receiverAddress2 || "")
+        setReceiverPostalCode(formData.receiverPostalCode)
+
+        setPickupType(formData.pickupType)
+        setPickupDate(formData.pickupDate)
+        console.log("Loading items from formData:", formData.items)
+        console.log("Items structure check:", JSON.stringify(formData.items, null, 2))
+        setItems(formData.items)
+        // Note: items state here shows OLD value because setState is async
+        console.log("Items state (OLD - before update):", items)
+
+        setShipmentId(shipment.id)
+        // Prefill locations from shipment
+        const { origin_address, destination_address } = shipment
+        setSenderCountry(origin_address.country)
+        setSenderCity(origin_address.city)
+        const originStates = getStatesOfCountry(origin_address.country)
+        const originStateObj = originStates.find(s => s.name.toLowerCase() === origin_address.state.toLowerCase())
+        if (originStateObj) setSenderState(originStateObj.code)
+
+        setReceiverCountry(destination_address.country)
+        setReceiverCity(destination_address.city)
+        const destStates = getStatesOfCountry(destination_address.country)
+        const destStateObj = destStates.find(s => s.name.toLowerCase() === destination_address.state.toLowerCase())
+        if (destStateObj) setReceiverState(destStateObj.code)
+
+        // Build search params from shipment
+        const reviewSearchParams: QuoteRequest = {
+          shipment_id: shipment.id, // Use shipment.id directly, not state
+          origin: {
+            country: origin_address.country,
+            state: origin_address.state,
+            city: origin_address.city || undefined,
+          },
+          destination: {
+            country: destination_address.country,
+            state: destination_address.state,
+            city: destination_address.city || undefined,
+          },
+          items: shipment.items,
+          currency: shipment.currency,
+          is_insured: shipment.is_insured,
+        }
+        setSearchParams(reviewSearchParams)
+
+        toast.info(`Reviewing shipment ${shipment.code}. Note: This shipment is already created.`)
+        setLoading(false)
+        return
+      } catch (error) {
+        console.error("Error loading review data:", error)
+        toast.error("Failed to load shipment data.")
+        router.push("/create-shipment")
+        return
+      }
+    }
+
+    // Normal flow: coming from quote selection
+    const selectedQuoteDataStr = sessionStorage.getItem('selected-quote-data')
+
+    if (!selectedQuoteDataStr) {
+      // No selection data - user refreshed or navigated directly
       toast.error("No shipment data found. Please start from the beginning.")
       router.push("/create-shipment")
       return
     }
 
-    // Set the initially selected quote if available
-    if (initialQuote) {
-      setSelectedQuote(initialQuote)
-    }
-    setSearchParams(cachedSearch)
+    try {
+      const { quoteData: selectedQuoteData, selectedQuoteId } = JSON.parse(selectedQuoteDataStr)
 
-    // Prefill location data from quote search
-    if (cachedSearch) {
+      if (!selectedQuoteData || !selectedQuoteId) {
+        router.push("/create-shipment")
+        return
+      }
+
+      // NOW populate context with the selected quote data
+      setQuoteData(selectedQuoteData)
+      setSelectedQuoteId(selectedQuoteId)
+
+
+      const { origin, destination, items: quoteItems, rates } = selectedQuoteData
+
+      // Build search params from quote data
+      const initialSearchParams: QuoteRequest = {
+        origin: {
+          country: origin.country,
+          state: origin.state,
+          city: origin.city || undefined,
+        },
+        destination: {
+          country: destination.country,
+          state: destination.state,
+          city: destination.city || undefined,
+        },
+        items: quoteItems,
+        currency: rates[0]?.currency || "NGN",
+        is_insured: selectedQuoteData.is_insured || true,
+      }
+      setSearchParams(initialSearchParams)
+
+      // Prefill ONLY location data (country, state, city)
+      // User will fill in all other details (name, email, phone, address, items, etc.)
+
       // Sender (origin)
-      setSenderCountry(cachedSearch.origin.country)
-      // Convert state name back to state code for the dropdown
-      const originStates = getStatesOfCountry(cachedSearch.origin.country)
-      const originStateObj = originStates.find(s => s.name.toLowerCase() === cachedSearch.origin.state.toLowerCase())
+      setSenderCountry(origin.country)
+      const originStates = getStatesOfCountry(origin.country)
+      const originStateObj = originStates.find(s => s.name.toLowerCase() === origin.state.toLowerCase())
       if (originStateObj) {
         setSenderState(originStateObj.code)
       }
-      if (cachedSearch.origin.city) {
-        setSenderCity(cachedSearch.origin.city)
+      if (origin.city) {
+        setSenderCity(origin.city)
       }
 
       // Receiver (destination)
-      setReceiverCountry(cachedSearch.destination.country)
-      // Convert state name back to state code for the dropdown
-      const destStates = getStatesOfCountry(cachedSearch.destination.country)
-      const destStateObj = destStates.find(s => s.name.toLowerCase() === cachedSearch.destination.state.toLowerCase())
+      setReceiverCountry(destination.country)
+      const destStates = getStatesOfCountry(destination.country)
+      const destStateObj = destStates.find(s => s.name.toLowerCase() === destination.state.toLowerCase())
       if (destStateObj) {
         setReceiverState(destStateObj.code)
       }
-      if (cachedSearch.destination.city) {
-        setReceiverCity(cachedSearch.destination.city)
+      if (destination.city) {
+        setReceiverCity(destination.city)
       }
+
+      // Set minimum pickup date to today
+      const today = new Date()
+      setPickupDate(today.toISOString().split('T')[0])
+
+      setLoading(false)
+    } catch (error) {
+      console.error("Error loading quote data:", error)
+      toast.error("Failed to load quote data. Please start again.")
+      router.push("/create-shipment")
     }
-
-    // Set minimum pickup date to tomorrow
-    const today = new Date()
-    setPickupDate(today.toISOString().split('T')[0])
-
-    setLoading(false)
-  }, [router])
+  }, [mode, router, setQuoteData, setSelectedQuoteId])
 
   const toggleSection = (section: string) => {
     setExpandedSection(expandedSection === section ? null : section)
@@ -240,8 +366,13 @@ export default function CheckoutPage() {
           declared_value: parseFloat(item.declaredValue),
         }
       })
+      
+      // sessionStorage.removeItem('selected-quote-data')
 
+      // Make a FRESH quote request WITHOUT quote_id
+      // User may have changed data, so treat as brand new request
       const quoteRequest: QuoteRequest = {
+        shipment_id: shipmentId,
         origin: {
           country: senderCountry,
           state: senderStateName.toLowerCase(),
@@ -253,32 +384,41 @@ export default function CheckoutPage() {
           city: receiverCity.toLowerCase() || undefined,
         },
         items: shipmentItems,
-        currency: searchParams?.currency || "NGN",
-        is_insured: searchParams?.is_insured || true,
+        currency: quoteData?.rates?.[0]?.currency || "NGN",
+        is_insured: quoteData?.is_insured || true,
+        // NO quote_id - fresh request
       }
 
-      // Fetch fresh quotes
-      const fetchedQuotes = await quotesApi.fetchQuotes(quoteRequest)
-      setQuotes(fetchedQuotes)
+      // Fetch fresh quotes from backend
+      const response = await quotesApi.fetchQuotes(quoteRequest)
 
-      // Auto-select quote: try to find the previously selected one, otherwise select first
-      if (selectedQuote) {
-        const matchingQuote = fetchedQuotes.find(q => q.quote_id === selectedQuote.quote_id)
-        if (matchingQuote) {
-          setSelectedQuote(matchingQuote)
+      if (response.status === "success") {
+        const fetchedQuotes = response.data.rates
+
+        // Store FRESH quote response in context (updates existing context)
+        setQuoteData(response.data)
+        setQuotes(fetchedQuotes)
+
+        // Auto-highlight: if previously selected quote_id exists in new rates, select it
+        // Otherwise select first rate
+        if (contextQuoteId) {
+          const matchingQuote = fetchedQuotes.find(q => q.quote_id === contextQuoteId)
+          if (matchingQuote) {
+            setSelectedQuote(matchingQuote)
+          } else if (fetchedQuotes.length > 0) {
+            setSelectedQuote(fetchedQuotes[0])
+          }
         } else if (fetchedQuotes.length > 0) {
           setSelectedQuote(fetchedQuotes[0])
         }
-      } else if (fetchedQuotes.length > 0) {
-        setSelectedQuote(fetchedQuotes[0])
+
+        // Build search params from the request
+        setSearchParams(quoteRequest)
+        // Move to quotes review step
+        setStep('quotes')
+        toast.success(`Found ${fetchedQuotes.length} shipping quotes!`)
       }
 
-      // Update search params
-      setSearchParams(quoteRequest)
-
-      // Move to quotes step
-      setStep('quotes')
-      toast.success(`Found ${fetchedQuotes.length} shipping quotes!`)
     } catch (error) {
       handleApiError(error)
     } finally {
@@ -476,20 +616,47 @@ export default function CheckoutPage() {
         save_destination_address: false,
         items: shipmentItems,
         origin_address: originAddress,
+        shipment_id: shipmentId,
         destination_address: destinationAddress,
         pickup_type: pickupType,
         pickup_scheduled_at: pickupType === "scheduled_pickup" ? pickupDate : undefined,
         customer_notes: null,
       }
 
-      const response = await createShipment(shipmentData)
+      let response
 
-      console.log(response)
-      if (response.status === "success") {
-        toast.success("Shipment created successfully!")
-        // Navigate to payment page with shipment ID
-        router.push(`/payment/${response.data.id}`)
-      }
+
+        // CREATE new shipment
+        response = await createShipment(shipmentData)
+        console.log(response, "created shipment", items)
+
+        if (response.status === "success") {
+          // Store shipment data for "back" navigation from payment page
+          sessionStorage.setItem('created-shipment-data', JSON.stringify({
+            shipment: response.data,
+            formData: {
+              senderName,
+              senderEmail,
+              senderPhone,
+              senderAddress1,
+              senderAddress2,
+              senderPostalCode,
+              receiverName,
+              receiverEmail,
+              receiverPhone,
+              receiverAddress1,
+              receiverAddress2,
+              receiverPostalCode,
+              pickupType,
+              pickupDate,
+              items,
+            }
+          }))
+
+          toast.success("Shipment created successfully!")
+          // Navigate to payment page with shipment ID
+          router.push(`/payment/${response.data.id}`)
+        }
     } catch (error: any) {
       handleApiError(error)
     } finally {
@@ -566,6 +733,21 @@ export default function CheckoutPage() {
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-6 lg:p-8 bg-slate-50">
         <div className="max-w-4xl mx-auto">
+          {/* Review Mode Banner */}
+          {mode === 'review' && (
+            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+              <svg className="h-6 w-6 text-blue-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div>
+                <h3 className="font-bold text-blue-900 mb-1">Reviewing Existing Shipment</h3>
+                <p className="text-sm text-blue-800">
+                  This shipment has already been created. You can review the details below and return to payment.
+                </p>
+              </div>
+            </div>
+          )}
+
           {step === 'details' ? (
             <>
 
@@ -1069,10 +1251,10 @@ export default function CheckoutPage() {
                   >
                     <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
                       <div className="flex items-start gap-4">
-                        <div className="flex-shrink-0">
-                          {quote.logo_url ? (
+                        <div className="shrink-0">
+                          {quote.carrier_logo_url ? (
                             <img
-                              src={quote.logo_url}
+                              src={quote.carrier_logo_url}
                               alt={quote.display_name}
                               className="h-12 w-12 object-contain"
                             />
@@ -1093,7 +1275,7 @@ export default function CheckoutPage() {
                             <Badge variant="info">
                               {quote.estimated_days} {quote.estimated_days === 1 ? 'day' : 'days'}
                             </Badge>
-                            {quote.is_insured && (
+                            {quote.metadata?.is_insured && (
                               <Badge variant="success">
                                 Insured
                               </Badge>
@@ -1150,6 +1332,8 @@ export default function CheckoutPage() {
                       <LoadingSpinner size="sm" className="mr-2" />
                       Creating Shipment...
                     </>
+                  ) : mode === 'review' ? (
+                    "Back to Payment"
                   ) : (
                     "Continue to Payment"
                   )}

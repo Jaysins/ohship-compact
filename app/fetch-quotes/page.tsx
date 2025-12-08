@@ -3,43 +3,75 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
-import type { Quote, QuoteRequest } from "@/types/quote"
-import { getStorageItem, setStorageItem, StorageKey } from "@/lib/utils/storage"
+import type { Quote } from "@/types/quote"
 import { formatCurrency, calculateDeliveryDate } from "@/lib/utils/format"
 import { LoadingSpinner, Button, Badge } from "@/components/ui"
+import { useQuote } from "@/lib/contexts/quote-context"
 
 export default function FetchQuotesPage() {
   const router = useRouter()
+  const { setQuoteData, setSelectedQuoteId } = useQuote()
 
   // State
   const [quotes, setQuotes] = useState<Quote[]>([])
-  const [searchParams, setSearchParams] = useState<QuoteRequest | null>(null)
+  const [quoteResponseData, setQuoteResponseData] = useState<any>(null)
+  const [origin, setOrigin] = useState<any>(null)
+  const [destination, setDestination] = useState<any>(null)
+  const [items, setItems] = useState<any[]>([])
+  const [currency, setCurrency] = useState<string>("NGN")
   const [loading, setLoading] = useState(true)
   const [expandedQuote, setExpandedQuote] = useState<string | null>(null)
 
-  // Load quotes from storage
+  // Load quotes from temporary sessionStorage (from Step 1)
   useEffect(() => {
-    const cachedQuotes = getStorageItem<Quote[]>(StorageKey.QUOTES_CACHE)
-    const cachedSearch = getStorageItem<QuoteRequest>(StorageKey.QUOTE_SEARCH)
+    const tempQuoteResponse = sessionStorage.getItem('temp-quote-response')
 
-    if (!cachedQuotes || cachedQuotes.length === 0) {
-      // No quotes found, redirect back
+    if (!tempQuoteResponse) {
+      // No temp data - user refreshed or navigated directly
+      // Redirect back to create shipment
       router.push("/create-shipment")
       return
     }
 
-    setQuotes(cachedQuotes)
-    setSearchParams(cachedSearch)
-    setLoading(false)
-  }, [router])
+    try {
+      const quoteData = JSON.parse(tempQuoteResponse)
+
+      if (!quoteData.rates || quoteData.rates.length === 0) {
+        router.push("/create-shipment")
+        return
+      }
+
+      setQuoteResponseData(quoteData)
+      setQuotes(quoteData.rates)
+      setOrigin(quoteData.origin)
+      setDestination(quoteData.destination)
+      setItems(quoteData.items)
+      setCurrency(quoteData.rates[0]?.currency || "NGN")
+      setLoading(false)
+    } catch (error) {
+      console.error("Error parsing quote response:", error)
+      router.push("/create-shipment")
+    }
+  }, [router, setQuoteData])
 
   const handleSelectQuote = (quoteId: string) => {
     const selectedQuote = quotes.find((q) => q.quote_id === quoteId)
-    if (selectedQuote) {
-      setStorageItem(StorageKey.SELECTED_QUOTE, selectedQuote)
-      // TODO: Navigate to checkout page in Phase 3
-      router.push("/checkout")
+
+    if (!selectedQuote || !quoteResponseData) {
+      return
     }
+
+        // Clear temporary quote response
+    sessionStorage.removeItem('temp-quote-response')
+
+    // Store selection in sessionStorage for reliable handoff to checkout
+    sessionStorage.setItem('selected-quote-data', JSON.stringify({
+      quoteData: quoteResponseData,
+      selectedQuoteId: selectedQuote.quote_id
+    }))
+
+
+    router.push("/checkout")
   }
 
   const toggleExpanded = (quoteId: string) => {
@@ -141,34 +173,30 @@ export default function FetchQuotesPage() {
       <main className="flex-1 p-4 md:p-6 lg:p-8 bg-slate-50">
         <div className="max-w-4xl mx-auto">
           {/* Shipment Summary */}
-          {searchParams && (
+          {origin && destination && items.length > 0 && (
             <div className="bg-white rounded-xl border border-slate-200 p-4 md:p-6 mb-6 shadow-sm">
               <h2 className="text-lg font-bold text-slate-900 mb-4">Shipment Summary</h2>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <p className="text-xs text-slate-600 mb-1">Route</p>
                   <p className="font-semibold text-slate-900">
-                    {searchParams.origin.state.charAt(0).toUpperCase() + searchParams.origin.state.slice(1)}, {searchParams.origin.country}
+                    {origin.state.charAt(0).toUpperCase() + origin.state.slice(1)}, {origin.country}
                     {" → "}
-                    {searchParams.destination.state.charAt(0).toUpperCase() + searchParams.destination.state.slice(1)}, {searchParams.destination.country}
+                    {destination.state.charAt(0).toUpperCase() + destination.state.slice(1)}, {destination.country}
                   </p>
                 </div>
-                {searchParams.items && searchParams.items.length > 0 && (
-                  <>
-                    <div>
-                      <p className="text-xs text-slate-600 mb-1">Item</p>
-                      <p className="font-semibold text-slate-900">
-                        {searchParams.items[0].quantity}x {searchParams.items[0].category_name}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-slate-600 mb-1">Weight & Value</p>
-                      <p className="font-semibold text-slate-900">
-                        {searchParams.items[0].weight} kg • {formatCurrency(searchParams.items[0].declared_value, searchParams.currency)}
-                      </p>
-                    </div>
-                  </>
-                )}
+                <div>
+                  <p className="text-xs text-slate-600 mb-1">Item</p>
+                  <p className="font-semibold text-slate-900">
+                    {items[0].quantity}x {items[0].category_name}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-600 mb-1">Weight & Value</p>
+                  <p className="font-semibold text-slate-900">
+                    {items[0].weight} kg • {formatCurrency(items[0].declared_value, currency)}
+                  </p>
+                </div>
               </div>
             </div>
           )}

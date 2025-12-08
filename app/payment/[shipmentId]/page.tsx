@@ -187,10 +187,11 @@ export default function PaymentPage() {
         toast.success("Payment proof uploaded successfully!")
         toast.info("Your payment is being verified. You will receive a confirmation email shortly.")
 
+        // Clear shipment data from session storage
+        sessionStorage.removeItem('created-shipment-data')
 
         // Redirect to success page or dashboard
         setTimeout(() => {
-          
           router.push(`/shipment/${shipment?.code}/success`)
         }, 2000)
       }
@@ -376,11 +377,17 @@ export default function PaymentPage() {
     <div className="relative flex min-h-screen w-full flex-col bg-white">
       {/* Top App Bar */}
       <div className="flex items-center border-b border-slate-200 bg-white p-4">
-        <Link href="/checkout" className="flex items-center gap-2 text-slate-600 hover:text-slate-900">
+        <button
+          onClick={() => {
+            // Navigate back to checkout with shipment data
+            router.push("/checkout?mode=review")
+          }}
+          className="flex items-center gap-2 text-slate-600 hover:text-slate-900"
+        >
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
-        </Link>
+        </button>
         <h1 className="text-xl font-bold text-slate-900 pl-4 flex-1">Step 4: Review & Payment</h1>
       </div>
 
@@ -587,7 +594,7 @@ export default function PaymentPage() {
           {/* Action Buttons */}
           <div className="flex flex-col-reverse sm:flex-row gap-3 sm:gap-4">
             <Button
-              onClick={() => router.push("/checkout")}
+              onClick={() => router.push("/checkout?mode=review")}
               variant="outline"
               disabled={submitting}
               className="w-full sm:w-auto"

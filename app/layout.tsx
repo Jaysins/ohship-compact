@@ -4,6 +4,7 @@ import { Manrope } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import { ToastProvider } from "@/components/ui/toast-provider"
 import { BrandThemeProvider } from "@/components/brand-theme-provider"
+import { Providers } from "@/components/providers"
 import { getThemeConfig } from "@/config/theme"
 import "./globals.css"
 
@@ -49,9 +50,11 @@ export default async function RootLayout({
     <html lang="en">
       <body className={`${manrope.className} font-display antialiased`}>
         <BrandThemeProvider theme={theme}>
-          {children}
-          <ToastProvider />
-          <Analytics />
+          <Providers>
+            {children}
+            <ToastProvider />
+            <Analytics />
+          </Providers>
         </BrandThemeProvider>
       </body>
     </html>
