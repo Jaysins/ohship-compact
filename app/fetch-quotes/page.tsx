@@ -36,17 +36,19 @@ export default function FetchQuotesPage() {
     try {
       const quoteData = JSON.parse(tempQuoteResponse)
 
-      if (!quoteData.rates || quoteData.rates.length === 0) {
+      const rates = Array.isArray(quoteData?.rates) ? quoteData.rates : []
+
+      if (rates.length === 0) {
         router.push("/create-shipment")
         return
       }
 
       setQuoteResponseData(quoteData)
-      setQuotes(quoteData.rates)
+      setQuotes(rates)
       setOrigin(quoteData.origin)
       setDestination(quoteData.destination)
       setItems(quoteData.items)
-      setCurrency(quoteData.rates[0]?.currency || "NGN")
+      setCurrency(rates[0]?.currency || "NGN")
       setLoading(false)
     } catch (error) {
       console.error("Error parsing quote response:", error)

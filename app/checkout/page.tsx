@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import Link from "next/link"
 import type { Quote, QuoteRequest, ShipmentItemUI, QuoteItem } from "@/types/quote"
 import type { CreateShipmentRequest, Address } from "@/types/shipment"
 import type { Category } from "@/types/category"
@@ -32,7 +31,6 @@ export default function CheckoutPage() {
 
   // Categories
   const [categories, setCategories] = useState<Category[]>([])
-  const [categoriesLoading, setCategoriesLoading] = useState(true)
 
   // Items
   const [items, setItems] = useState<ShipmentItemUI[]>([
@@ -95,12 +93,6 @@ export default function CheckoutPage() {
   const senderCities = senderState ? getCitiesOfState(senderCountry, senderState) : []
   const receiverCities = receiverState ? getCitiesOfState(receiverCountry, receiverState) : []
 
-  // Debug: Log when items change
-  useEffect(() => {
-    console.log("Items state updated to:", items)
-    console.log("Number of items:", items.length)
-  }, [items])
-
   // Load categories on mount
   useEffect(() => {
     const loadCategories = async () => {
@@ -120,16 +112,12 @@ export default function CheckoutPage() {
 
         // Set default category for first item ONLY if not in review mode
         // In review mode, items are loaded from sessionStorage and shouldn't be overwritten
-        // Also only set if categoryId is empty (new item)
         const isReviewMode = urlParams.get('mode') === 'review'
         if (!isReviewMode && uniqueCategories.length > 0 && items[0] && !items[0].categoryId) {
-          console.log("Setting default category for new item")
           updateItem(0, { categoryId: uniqueCategories[0].id })
         }
       } catch (error) {
         handleApiError(error)
-      } finally {
-        setCategoriesLoading(false)
       }
     }
 
@@ -140,7 +128,6 @@ export default function CheckoutPage() {
   // Load initial data from sessionStorage and populate context
   useEffect(() => {
     // Check if coming back from payment page (review mode)
-    console.log("we in mode===>", mode)
     if (mode === 'review') {
       const createdShipmentDataStr = sessionStorage.getItem('created-shipment-data')
       if (!createdShipmentDataStr) {
@@ -168,11 +155,7 @@ export default function CheckoutPage() {
 
         setPickupType(formData.pickupType)
         setPickupDate(formData.pickupDate)
-        console.log("Loading items from formData:", formData.items)
-        console.log("Items structure check:", JSON.stringify(formData.items, null, 2))
         setItems(formData.items)
-        // Note: items state here shows OLD value because setState is async
-        console.log("Items state (OLD - before update):", items)
 
         setShipmentId(shipment.id)
         // Prefill locations from shipment
@@ -243,6 +226,9 @@ export default function CheckoutPage() {
 
 
       const { origin, destination, items: quoteItems, rates } = selectedQuoteData
+
+      // Initialize quotes from selectedQuoteData
+      setQuotes(Array.isArray(rates) ? rates : [])
 
       // Build search params from quote data
       const initialSearchParams: QuoteRequest = {
@@ -393,7 +379,7 @@ export default function CheckoutPage() {
       const response = await quotesApi.fetchQuotes(quoteRequest)
 
       if (response.status === "success") {
-        const fetchedQuotes = response.data.rates
+        const fetchedQuotes = response.data?.rates || []
 
         // Store FRESH quote response in context (updates existing context)
         setQuoteData(response.data)
@@ -609,6 +595,7 @@ export default function CheckoutPage() {
       })
 
       const shipmentData: CreateShipmentRequest = {
+        shipment_id: shipmentId,
         quote_id: selectedQuote.quote_id,
         channel_code: "web",
         is_insured: searchParams.is_insured,
@@ -616,7 +603,6 @@ export default function CheckoutPage() {
         save_destination_address: false,
         items: shipmentItems,
         origin_address: originAddress,
-        shipment_id: shipmentId,
         destination_address: destinationAddress,
         pickup_type: pickupType,
         pickup_scheduled_at: pickupType === "scheduled_pickup" ? pickupDate : undefined,
@@ -628,7 +614,6 @@ export default function CheckoutPage() {
 
         // CREATE new shipment
         response = await createShipment(shipmentData)
-        console.log(response, "created shipment", items)
 
         if (response.status === "success") {
           // Store shipment data for "back" navigation from payment page
@@ -654,9 +639,8 @@ export default function CheckoutPage() {
           }))
 
           toast.success("Shipment created successfully!")
-          // Navigate to payment page with shipment ID
           router.push(`/payment/${response.data.id}`)
-        }
+      }
     } catch (error: any) {
       handleApiError(error)
     } finally {
